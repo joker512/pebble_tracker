@@ -1,0 +1,3 @@
+[submodule "joker512.github.io"]
+	path = joker512.github.io
+	url = git@github.com:joker512/joker512.github.io.git

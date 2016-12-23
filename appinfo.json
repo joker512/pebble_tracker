@@ -1,0 +1,29 @@
+{
+  "uuid": "3f2a6c01-e375-4bab-bd0c-3ae8af98bce2",
+  "shortName": "TimeTracker",
+  "longName": "Time Tracker",
+  "capabilities": [
+    "configurable"
+  ],
+  "companyName": "Sergey Kotsur",
+  "versionCode": 1,
+  "versionLabel": "1.0",
+  "watchapp": {
+    "watchface": false
+  },
+  "appKeys": {},
+  "resources": {
+    "media": [
+      {
+        "menuIcon": true,
+        "type": "bitmap",
+        "name": "IMAGE_MENU_ICON",
+        "file": "images/icon.png"
+      }
+    ]
+  },
+  "targetPlatforms": [
+    "basalt"
+  ],
+  "sdkVersion": "3"
+}

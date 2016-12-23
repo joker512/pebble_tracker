@@ -1,2 +1,2 @@
-# pebble_tracker
-Powerfull time tracker for Pebble
+# Pebble tracker
+Description will be ready soon.
