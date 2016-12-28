@@ -109,10 +109,12 @@ public:
 	int updateTime();
 	void addTime(int);
 	void subTime(int);
+	void resetSelectedTime();
 	void resetTime(bool);
 
 	int totalHeight() const;
 	int totalTime() const;
+	int totalTime(bool) const;
 
 private:
 	static const int HEADER_SIZE;
@@ -121,5 +123,6 @@ private:
 	int selectedIndex = NULL_V;
 	int activeIndex1 = NULL_V;
 	int lastTimeStamp = NULL_V;
+	int accumulatedTime = 0;
 };
 

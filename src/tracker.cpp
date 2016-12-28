@@ -106,26 +106,47 @@ void drawRow(GContext* ctx, const Layer* cell_layer, MenuIndex* cell_index, void
 }
 
 void drawHeader(GContext* ctx, const Layer* cell_layer, uint16_t, void*) {
+	int selIndex = trackingList->getSelectedIndex();
 	TrackingListMode mode = trackingList->getMode();
 	time_t t = time(0L);
 	struct tm* now = localtime(&t);
 	static char time[6];
 	snprintf(time, sizeof(time), "%d:%02d", now->tm_hour, now->tm_min);
-	int timeInSecs = trackingList->totalTime();
-	static char totalTime[6];
-	snprintf(totalTime, sizeof(totalTime), "%d:%02d", timeInSecs / (MINUTES_Q * 60), timeInSecs / MINUTES_Q % 60);
+	int timeInSecs = trackingList->totalTime(false);
+	int accTimeInSecs = trackingList->totalTime();
+	static char totalTime[13];
+	if (timeInSecs != accTimeInSecs || mode == FREEZE_MODE)
+		snprintf(totalTime, sizeof(totalTime), "%d:%02d/%d:%02d", timeInSecs / (MINUTES_Q * 60), timeInSecs / MINUTES_Q % 60,
+									  accTimeInSecs / (MINUTES_Q * 60), accTimeInSecs / MINUTES_Q % 60);
+	else
+		snprintf(totalTime, sizeof(totalTime), "%d:%02d", timeInSecs / (MINUTES_Q * 60), timeInSecs / MINUTES_Q % 60);
 
 	GRect bounds = layer_get_bounds(cell_layer);
 	GRect nameBounds = { LEFT_MARGIN, 0, bounds.size.w * 3 / 4 - LEFT_MARGIN, bounds.size.h };
-	GRect timeBounds = { bounds.size.w * 3 / 4, 0, bounds.size.w / 4 - RIGHT_MARGIN, bounds.size.h };
+	GRect timeBounds = { bounds.size.w / 2, 0, bounds.size.w / 2 - RIGHT_MARGIN, bounds.size.h };
 
 	if (mode == NORMAL_MODE || mode == FREEZE_MODE)
-		graphics_context_set_fill_color(ctx, trackingList->getSelectedIndex() != NULL_V ? GColorJaegerGreen : GColorIslamicGreen);
+		graphics_context_set_fill_color(ctx, selIndex != NULL_V ? GColorJaegerGreen : GColorIslamicGreen);
 	else if (mode == BUILD_BREAK_MODE)
-		graphics_context_set_fill_color(ctx, trackingList->getSelectedIndex() != NULL_V ? GColorPictonBlue : GColorBlueMoon);
+		graphics_context_set_fill_color(ctx, selIndex != NULL_V ? GColorPictonBlue : GColorBlueMoon);
 	graphics_fill_rect(ctx, bounds, 0, GCornersAll);
 	graphics_draw_line(ctx, GPoint(0, bounds.size.h - 1), GPoint(bounds.size.w, bounds.size.h - 1));
 	graphics_draw_text(ctx, time, status_font, nameBounds, GTextOverflowModeFill, GTextAlignmentLeft, NULL);
+
+	if (mode == FREEZE_MODE && selIndex == NULL_V) {
+		int digitShiftX = 47;
+		if (changeTimePos == 1)
+			digitShiftX = 57;
+		else if (changeTimePos == 2)
+			digitShiftX = 63;
+		int digitShiftY = 15;
+		int digitWidth = 4;
+		graphics_context_set_stroke_color(ctx, GColorBlack);
+		graphics_context_set_stroke_width(ctx, 1);
+		graphics_context_set_antialiased(ctx, true);
+		graphics_draw_line(ctx, GPoint(timeBounds.origin.x + digitShiftX, digitShiftY),
+					GPoint(timeBounds.origin.x + digitShiftX + digitWidth, digitShiftY));
+	}
 	graphics_draw_text(ctx, totalTime, status_font, timeBounds, GTextOverflowModeFill, GTextAlignmentRight, NULL);
 }
 
@@ -168,28 +189,32 @@ void backClick(ClickRecognizerRef, void*) {
 void selectClick(ClickRecognizerRef c, void*) {
 	TrackingListMode mode = trackingList->getMode();
 	int selIndex = trackingList->getSelectedIndex();
-	if (selIndex == NULL_V) {
-		trackingList->switchMode(mode == NORMAL_MODE ? BUILD_BREAK_MODE : NORMAL_MODE);
-	}
-	else {
-		switch(mode) {
-			case NORMAL_MODE:
-				if (selIndex == trackingList->getActiveIndex()) {
+	switch(mode) {
+		case NORMAL_MODE:
+			if (selIndex == NULL_V) {
+				trackingList->switchMode(BUILD_BREAK_MODE);
+			}
+			else {
+				if (selIndex == trackingList->getActiveIndex())
 					vibes_enqueue_custom_pattern(tinyVibe);
-				}
-			case BUILD_BREAK_MODE:
 				trackingList->switchIndex();
-				break;
-			case FREEZE_MODE:
-				if (changeTimePos < 2) {
-					freezeTime = time(0L);
-					++changeTimePos;
-				}
-				else {
-					trackingList->switchMode(NORMAL_MODE);
-				}
-				break;
-		}
+			}
+			break;
+		case BUILD_BREAK_MODE:
+			if (selIndex == NULL_V)
+				trackingList->switchMode(NORMAL_MODE);
+			else
+				trackingList->switchIndex();
+			break;
+		case FREEZE_MODE:
+			if (changeTimePos < 2) {
+				freezeTime = time(0L);
+				++changeTimePos;
+			}
+			else {
+				trackingList->switchMode(NORMAL_MODE);
+			}
+			break;
 	}
 	menu_layer_reload_data(menu_layer);
 }
@@ -199,9 +224,9 @@ void longSelectClick(ClickRecognizerRef, void*) {
 	switch(trackingList->getMode()) {
 		case NORMAL_MODE:
 			if (selIndex == NULL_V) {
-				if (trackingList->totalTime() != 0) {
+				if (trackingList->totalTime(false) != 0) {
 					serialize();
-					trackingList->resetTime(true);
+					trackingList->resetTime(false);
 				}
 				else {
 					restore();
@@ -221,7 +246,7 @@ void longSelectClick(ClickRecognizerRef, void*) {
 			trackingList->breakPair();
 			break;
 		case FREEZE_MODE:
-			trackingList->resetTime(false);
+			trackingList->resetSelectedTime();
 			trackingList->switchMode(NORMAL_MODE);
 			break;
 	}
@@ -229,12 +254,30 @@ void longSelectClick(ClickRecognizerRef, void*) {
 }
 
 static void longUpClick(ClickRecognizerRef, void*) {
-	if (trackingList->getMode() != FREEZE_MODE) {
-		trackingList->decIndex(3);
-	}
-	else {
-		freezeTime = time(0L);
-		trackingList->decIndex();
+	switch(trackingList->getMode()) {
+		case NORMAL_MODE:
+			if (trackingList->getSelectedIndex() == NULL_V) {
+				if (trackingList->totalTime() != 0) {
+					if(trackingList->totalTime(false) != 0)
+						serialize();
+					trackingList->resetTime(true);
+				}
+				else {
+					restore();
+				}
+			}
+			else {
+				trackingList->decIndex();
+			}
+			break;
+		case BUILD_BREAK_MODE:
+			trackingList->decIndex(3);
+			break;
+		case FREEZE_MODE:
+			freezeTime = time(0L);
+			trackingList->decIndex();
+			break;
+
 	}
 	menu_layer_set_selected_index(menu_layer, MenuIndex(0, trackingList->getSelectedIndex()), MenuRowAlignNone, true);
 }
@@ -252,12 +295,25 @@ static void upClick(ClickRecognizerRef, void*) {
 }
 
 static void longDownClick(ClickRecognizerRef, void*) {
-	if (trackingList->getMode() != FREEZE_MODE) {
-		trackingList->incIndex(3);
-	}
-	else {
-		freezeTime = time(0L);
-		trackingList->incIndex();
+	TrackingListMode mode = trackingList->getMode();
+	switch(trackingList->getMode()) {
+		case NORMAL_MODE:
+			if (trackingList->getSelectedIndex() == NULL_V) {
+				trackingList->switchMode(FREEZE_MODE);
+				freezeTime = time(0L);
+				changeTimePos = 0;
+			}
+			else {
+				trackingList->incIndex(3);
+			}
+			break;
+		case BUILD_BREAK_MODE:
+			trackingList->incIndex(3);
+			break;
+		case FREEZE_MODE:
+			freezeTime = time(0L);
+			trackingList->incIndex();
+			break;
 	}
 	menu_layer_set_selected_index(menu_layer, MenuIndex(0, trackingList->getSelectedIndex()), MenuRowAlignNone, true);
 }

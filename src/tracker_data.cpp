@@ -1,7 +1,7 @@
 #include "tracker_data.hpp"
 #include <numeric>
 
-const int TrackingList::HEADER_SIZE = 7;
+const int TrackingList::HEADER_SIZE = 11;
 
 using namespace std;
 
@@ -72,6 +72,7 @@ schar* TrackingList::serialize() {
 	s[1] = (schar)selectedIndex;
 	s[2] = (schar)activeIndex1;
 	*(int*)(s + 3) = lastTimeStamp;
+	*(int*)(s + 7) = accumulatedTime;
 	for(int i = 0; i < size(); ++i) {
 		while(at(i)->getHeight() > 1) {
 			s[HEADER_SIZE + (i + at(i)->getHeight()) * 5 - 1] = ')';
@@ -83,6 +84,7 @@ schar* TrackingList::serialize() {
 	}
 	app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "%02x%02x%02x", s[0], s[1], s[2]);
 	app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "%d", *(int*)(s + 3));
+	app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "%d", *(int*)(s + 7));
 	for(int i = 0; i < size(); ++i) {
 		app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "%d%c", *(int*)(s + HEADER_SIZE + i * 5), s[HEADER_SIZE + i * 5 + 4]);
 	}
@@ -101,15 +103,19 @@ void TrackingList::restore(schar* s) {
 	selectedIndex = s[1];
 	activeIndex1 = s[2];
 	lastTimeStamp = *(int*)(s + 3);
+	accumulatedTime = *(int*)(s + 7);
 	updateTime();
 }
 
 void TrackingList::addTime(int value) {
-	if (selectedIndex != NULL_V && mode == FREEZE_MODE) {
+	if (selectedIndex != NULL_V) {
 		this->at(selectedIndex)->time = max(0, this->at(selectedIndex)->time + value);
 		if (activeIndex1 != NULL_V && activeIndex1 != selectedIndex) {
 			this->at(activeIndex1)->time = max(0, this->at(activeIndex1)->time - value);
 		}
+	}
+	else {
+		accumulatedTime = max(0, accumulatedTime + value);
 	}
 }
 
@@ -300,11 +306,19 @@ int TrackingList::updateTime() {
 	return newTime;
 }
 
-void TrackingList::resetTime(bool all) {
-	if (all)
-		for_each(this->begin(), this->end(), [](BaseTracking* a) { a->time = 0; });
-	else
+void TrackingList::resetSelectedTime() {
+	if (selectedIndex != NULL_V)
 		this->at(selectedIndex)->time = 0;
+	else
+		accumulatedTime = 0;
+}
+
+void TrackingList::resetTime(bool resetAccumulated) {
+	if (resetAccumulated)
+		accumulatedTime = 0;
+	else
+		accumulatedTime += totalTime(false);
+	for_each(this->begin(), this->end(), [](BaseTracking* a) { a->time = 0; });
 }
 
 int TrackingList::totalHeight() const {
@@ -312,5 +326,10 @@ int TrackingList::totalHeight() const {
 }
 
 int TrackingList::totalTime() const {
-	return accumulate(begin(), end(), 0, [](int a, BaseTracking* b) { return a + b->time; });
+	return totalTime(true);
+}
+
+int TrackingList::totalTime(bool accumulated) const {
+	int totalTime = accumulate(begin(), end(), 0, [](int a, BaseTracking* b) { return a + b->time; });
+	return accumulated ? totalTime + accumulatedTime : totalTime;
 }
