@@ -86,14 +86,18 @@ public:
 	int getActiveIndex() const {
 		return activeIndex1;
 	}
+	int getPreviousActiveIndex() const {
+		return activeIndex2;
+	}
 
 	int getBinarySize();
 	schar* serialize();
-	void restore(schar*);
+	void deserialize(schar*);
 
 	void switchMode(TrackingListMode);
 	void resetIndex();
-	void restoreIndex();
+	void restoreSelected();
+	void restorePreviousActive();
 	void incIndex();
 	void incIndex(int);
 	void decIndex();
@@ -103,8 +107,10 @@ public:
 	bool buildPair();
 	bool buildPair(int);
 	bool buildPair(int, int);
+	bool buildAll();
 	bool breakPair();
 	bool breakPair(int);
+	bool breakAll();
 
 	int updateTime();
 	void addTime(int);
@@ -122,6 +128,7 @@ private:
 	TrackingListMode mode = NORMAL_MODE;
 	int selectedIndex = NULL_V;
 	int activeIndex1 = NULL_V;
+	int activeIndex2 = NULL_V;
 	int lastTimeStamp = NULL_V;
 	int accumulatedTime = 0;
 };

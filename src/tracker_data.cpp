@@ -91,7 +91,7 @@ schar* TrackingList::serialize() {
 	return s;
 }
 
-void TrackingList::restore(schar* s) {
+void TrackingList::deserialize(schar* s) {
 	for(int i = 0, k = 0; k < size(); ++i) {
 		at(k)->time = *(int*)(s + HEADER_SIZE + i * 5);
 		if (s[HEADER_SIZE + i * 5 + 4] == ',')
@@ -129,12 +129,19 @@ void TrackingList::switchMode(TrackingListMode newMode) {
 }
 
 void TrackingList::resetIndex() {
+	activeIndex2 = NULL_V;
 	selectedIndex = NULL_V;
 }
 
-void TrackingList::restoreIndex() {
+void TrackingList::restoreSelected() {
 	if (activeIndex1 != NULL_V)
 		selectedIndex = activeIndex1;
+}
+
+void TrackingList::restorePreviousActive() {
+	activeIndex1 = activeIndex2;
+	activeIndex2 = selectedIndex;
+	selectedIndex = activeIndex1;
 }
 
 void TrackingList::incIndex() {
@@ -142,6 +149,7 @@ void TrackingList::incIndex() {
 }
 
 void TrackingList::incIndex(int c) {
+	activeIndex2 = NULL_V;
 	for (int i = 0; i < c; ++i) {
 		if (selectedIndex == NULL_V || selectedIndex == size() - 1)
 			selectedIndex = 0;
@@ -168,10 +176,14 @@ void TrackingList::switchIndex() {
 		switch(mode) {
 			case NORMAL_MODE:
 				updateTime();
-				if (activeIndex1 == NULL_V || activeIndex1 != selectedIndex)
+				if (activeIndex1 == NULL_V || activeIndex1 != selectedIndex) {
+					activeIndex2 = activeIndex1;
 					activeIndex1 = selectedIndex;
-				else
+				}
+				else {
+					activeIndex2 = NULL_V;
 					activeIndex1 = NULL_V;
+				}
 				break;
 			case BUILD_BREAK_MODE:
 				if (activeIndex1 == selectedIndex) {
@@ -187,9 +199,8 @@ void TrackingList::switchIndex() {
 
 bool TrackingList::buildPair() {
 	if (activeIndex1 == NULL_V) {
-		for(int i = 0; i < size() - 1; ++i) {
-			while(buildPair(i, i + 1));
-		}
+		for(int i = 0; i < size() - 1; ++i)
+			buildPair(i, i + 1);
 		activeIndex1 = NULL_V;
 		return true;
 	}
@@ -226,15 +237,22 @@ bool TrackingList::buildPair(int activeIndex1, int activeIndex2) {
 	return result;
 }
 
+bool TrackingList::buildAll() {
+	for(int i = 0; i < size() - 1; ++i) {
+		while(buildPair(i, i + 1));
+	}
+	activeIndex1 = NULL_V;
+	return true;
+}
+
 bool TrackingList::breakPair() {
 	if (selectedIndex != NULL_V)
 		return breakPair(selectedIndex);
 	else if (activeIndex1 != NULL_V)
 		return breakPair(activeIndex1);
 	for(int i = 0; i < size(); ++i) {
-		while(at(i)->getHeight() > 1) {
-			breakPair(i);
-		}
+		if (breakPair(i))
+			++i;
 	}
 	return true;
 }
@@ -292,6 +310,15 @@ bool TrackingList::breakPair(int index) {
 	insert(this->begin() + index, element2);
 	insert(this->begin() + index, element1);
 
+	return true;
+}
+
+bool TrackingList::breakAll() {
+	for(int i = 0; i < size(); ++i) {
+		while(at(i)->getHeight() > 1) {
+			breakPair(i);
+		}
+	}
 	return true;
 }
 

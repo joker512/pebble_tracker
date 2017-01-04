@@ -8,6 +8,7 @@ const int LEFT_MARGIN = 4;
 const int RIGHT_MARGIN = LEFT_MARGIN;
 const int MINUTES_Q = 60;
 const int MAX_FREEZE_TIME = 60;
+const int LONG_PRESS_STEP = 3;
 
 static TrackingList* trackingList;
 
@@ -30,11 +31,11 @@ inline void serialize() {
 	delete[] buffer;
 }
 
-inline void restore() {
+inline void deserialize() {
 	if (persist_exists(0)) {
 		schar* buffer = new schar[trackingList->getBinarySize()];
 		persist_read_data(0, buffer, trackingList->getBinarySize());
-		trackingList->restore(buffer);
+		trackingList->deserialize(buffer);
 		delete[] buffer;
 	}
 }
@@ -179,7 +180,7 @@ void backClick(ClickRecognizerRef, void*) {
 				if (trackingList->getActiveIndex() != NULL_V)
 					trackingList->switchMode(NORMAL_MODE);
 				trackingList->buildPair();
-				trackingList->restoreIndex();
+				trackingList->restoreSelected();
 			}
 			break;
 	}
@@ -229,7 +230,7 @@ void longSelectClick(ClickRecognizerRef, void*) {
 					trackingList->resetTime(false);
 				}
 				else {
-					restore();
+					deserialize();
 				}
 			}
 			else {
@@ -241,7 +242,7 @@ void longSelectClick(ClickRecognizerRef, void*) {
 		case BUILD_BREAK_MODE:
 			if (selIndex == NULL_V && trackingList->getActiveIndex() != NULL_V) {
 				trackingList->switchMode(NORMAL_MODE);
-				trackingList->restoreIndex();
+				trackingList->restoreSelected();
 			}
 			trackingList->breakPair();
 			break;
@@ -254,24 +255,31 @@ void longSelectClick(ClickRecognizerRef, void*) {
 }
 
 static void longUpClick(ClickRecognizerRef, void*) {
+	int selIndex = trackingList->getSelectedIndex();
 	switch(trackingList->getMode()) {
 		case NORMAL_MODE:
-			if (trackingList->getSelectedIndex() == NULL_V) {
+			if (selIndex == NULL_V) {
 				if (trackingList->totalTime() != 0) {
 					if(trackingList->totalTime(false) != 0)
 						serialize();
 					trackingList->resetTime(true);
 				}
 				else {
-					restore();
+					deserialize();
 				}
 			}
+			else if (trackingList->getPreviousActiveIndex() != NULL_V && selIndex < LONG_PRESS_STEP) {
+				trackingList->restorePreviousActive();
+			}
 			else {
-				trackingList->decIndex();
+				trackingList->decIndex(LONG_PRESS_STEP);
 			}
 			break;
 		case BUILD_BREAK_MODE:
-			trackingList->decIndex(3);
+			if (selIndex == NULL_V)
+				trackingList->buildAll();
+			else
+				trackingList->decIndex(LONG_PRESS_STEP);
 			break;
 		case FREEZE_MODE:
 			freezeTime = time(0L);
@@ -295,20 +303,27 @@ static void upClick(ClickRecognizerRef, void*) {
 }
 
 static void longDownClick(ClickRecognizerRef, void*) {
+	int selIndex = trackingList->getSelectedIndex();
 	TrackingListMode mode = trackingList->getMode();
 	switch(trackingList->getMode()) {
 		case NORMAL_MODE:
-			if (trackingList->getSelectedIndex() == NULL_V) {
+			if (selIndex == NULL_V) {
 				trackingList->switchMode(FREEZE_MODE);
 				freezeTime = time(0L);
 				changeTimePos = 0;
 			}
+			else if (trackingList->getPreviousActiveIndex() != NULL_V && selIndex >= trackingList->size() - LONG_PRESS_STEP) {
+				trackingList->restorePreviousActive();
+			}
 			else {
-				trackingList->incIndex(3);
+				trackingList->incIndex(LONG_PRESS_STEP);
 			}
 			break;
 		case BUILD_BREAK_MODE:
-			trackingList->incIndex(3);
+			if (selIndex == NULL_V)
+				trackingList->breakAll();
+			else
+				trackingList->incIndex(LONG_PRESS_STEP);
 			break;
 		case FREEZE_MODE:
 			freezeTime = time(0L);
@@ -483,7 +498,7 @@ static void init(void) {
 	windowHandlers.unload = window_unload;
 	window_set_window_handlers(window, windowHandlers);
 
-	restore();
+	deserialize();
 	window_stack_push(window, true);
 
 	app_message_register_inbox_received(handle_msg_received);
