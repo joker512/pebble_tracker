@@ -351,13 +351,15 @@ void handleBluetooth(bool connected) {
 	bluetoothLastState = connected;
 }
 
-void handleTick(tm* tickTime, TimeUnits) {
+void handleTick(tm* tickTime, TimeUnits units) {
 	int elementTime = trackingList->updateTime();
-	if (elementTime >= 60 && elementTime / 60 % 60 == 0)
-		vibes_short_pulse();
-	if (trackingList->getMode() == FREEZE_MODE && mktime(tickTime) - freezeTime >= MAX_FREEZE_TIME)
-		trackingList->switchMode(NORMAL_MODE);
-	menu_layer_reload_data(menu_layer);
+	if (units & MINUTE_UNIT || elementTime % 60 == 0) {
+		if (elementTime > 0 && elementTime % 3600 == 0)
+			vibes_short_pulse();
+		if (trackingList->getMode() == FREEZE_MODE && mktime(tickTime) - freezeTime >= MAX_FREEZE_TIME)
+			trackingList->switchMode(NORMAL_MODE);
+		menu_layer_reload_data(menu_layer);
+	}
 }
 
 static void window_load(Window* window) {
@@ -506,10 +508,11 @@ static void init(void) {
 
 	bluetoothLastState = bluetooth_connection_service_peek();
 	bluetooth_connection_service_subscribe(handleBluetooth);
-	tick_timer_service_subscribe(MINUTE_UNIT, handleTick);
+	tick_timer_service_subscribe(SECOND_UNIT, handleTick);
 }
 
 static void deinit(void) {
+	tick_timer_service_unsubscribe();
 	serialize();
 	window_destroy(window);
 }
