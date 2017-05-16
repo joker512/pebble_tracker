@@ -123,8 +123,8 @@ void drawHeader(GContext* ctx, const Layer* cell_layer, uint16_t, void*) {
 		snprintf(totalTime, sizeof(totalTime), "%d:%02d", timeInSecs / (MINUTES_Q * 60), timeInSecs / MINUTES_Q % 60);
 
 	GRect bounds = layer_get_bounds(cell_layer);
-	GRect nameBounds = { LEFT_MARGIN, 0, bounds.size.w * 3 / 4 - LEFT_MARGIN, bounds.size.h };
-	GRect timeBounds = { bounds.size.w / 2, 0, bounds.size.w / 2 - RIGHT_MARGIN, bounds.size.h };
+	GRect timeBounds = { LEFT_MARGIN, 0, bounds.size.w / 4 - LEFT_MARGIN, bounds.size.h };
+	GRect totalTimeBounds = { bounds.size.w / 4, 0, 3 * bounds.size.w / 4 - RIGHT_MARGIN, bounds.size.h };
 
 	if (mode == NORMAL_MODE || mode == FREEZE_MODE)
 		graphics_context_set_fill_color(ctx, selIndex != NULL_V ? GColorJaegerGreen : GColorIslamicGreen);
@@ -132,7 +132,7 @@ void drawHeader(GContext* ctx, const Layer* cell_layer, uint16_t, void*) {
 		graphics_context_set_fill_color(ctx, selIndex != NULL_V ? GColorPictonBlue : GColorBlueMoon);
 	graphics_fill_rect(ctx, bounds, 0, GCornersAll);
 	graphics_draw_line(ctx, GPoint(0, bounds.size.h - 1), GPoint(bounds.size.w, bounds.size.h - 1));
-	graphics_draw_text(ctx, time, status_font, nameBounds, GTextOverflowModeFill, GTextAlignmentLeft, NULL);
+	graphics_draw_text(ctx, time, status_font, timeBounds, GTextOverflowModeFill, GTextAlignmentLeft, NULL);
 
 	if (mode == FREEZE_MODE && selIndex == NULL_V) {
 		int digitShiftX = 47;
@@ -145,10 +145,10 @@ void drawHeader(GContext* ctx, const Layer* cell_layer, uint16_t, void*) {
 		graphics_context_set_stroke_color(ctx, GColorBlack);
 		graphics_context_set_stroke_width(ctx, 1);
 		graphics_context_set_antialiased(ctx, true);
-		graphics_draw_line(ctx, GPoint(timeBounds.origin.x + digitShiftX, digitShiftY),
-					GPoint(timeBounds.origin.x + digitShiftX + digitWidth, digitShiftY));
+		graphics_draw_line(ctx, GPoint(totalTimeBounds.origin.x + digitShiftX, digitShiftY),
+					GPoint(totalTimeBounds.origin.x + digitShiftX + digitWidth, digitShiftY));
 	}
-	graphics_draw_text(ctx, totalTime, status_font, timeBounds, GTextOverflowModeFill, GTextAlignmentRight, NULL);
+	graphics_draw_text(ctx, totalTime, status_font, totalTimeBounds, GTextOverflowModeFill, GTextAlignmentRight, NULL);
 }
 
 void backClick(ClickRecognizerRef, void*) {
