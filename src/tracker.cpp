@@ -6,9 +6,10 @@ const int HEADER_HEIGHT = 18;
 const int MAX_LIST_SIZE = 6;
 const int LEFT_MARGIN = 4;
 const int RIGHT_MARGIN = LEFT_MARGIN;
-const int MINUTES_Q = 60;
 const int MAX_FREEZE_TIME = 60;
 const int LONG_PRESS_STEP = 3;
+const int RECEIVED_ELEMENTS_KEYMAP = -10;
+const int RECEIVED_HOURS_KEYMAP = 1000;
 
 static TrackingList* trackingList;
 
@@ -22,8 +23,12 @@ static time_t freezeTime;
 static int changeTimePos;
 static std::map<int, int> changeTimeAdds;
 
-static const uint32_t shortDuration[] = {100};
-static VibePattern tinyVibe = { .durations = shortDuration, .num_segments = 1 };
+static const uint32_t tinyDuration[] = {100};
+static VibePattern tinyVibe = { .durations = tinyDuration, .num_segments = 1 };
+static const uint32_t longDurations[] = {400, 200, 500, 200, 500};
+static VibePattern smallVibe = { .durations = longDurations, .num_segments = 1 };
+static VibePattern longVibe = { .durations = longDurations, .num_segments = 3 };
+static VibePattern veryLongVibe = { .durations = longDurations, .num_segments = 5 };
 
 inline void serialize() {
 	schar* buffer = trackingList->serialize();
@@ -68,7 +73,7 @@ void drawRow(GContext* ctx, const Layer* cell_layer, MenuIndex* cell_index, void
 	bool isActive = trackingList->getActiveIndex() == row;
 	int timeInSecs = trackingList->at(row)->getTime();
 	static char time[MAX_LIST_SIZE][6];
-	snprintf(time[row], sizeof(time[row]), "%d:%02d", timeInSecs / (60 * MINUTES_Q), timeInSecs / MINUTES_Q % 60);
+	snprintf(time[row], sizeof(time[row]), "%d:%02d", timeInSecs / (60 * 60), timeInSecs / 60 % 60);
 
 	GRect bounds = layer_get_bounds(cell_layer);
 	GRect nameBounds = { LEFT_MARGIN, 0, bounds.size.w * 2 / 3 - LEFT_MARGIN, bounds.size.h };
@@ -117,10 +122,10 @@ void drawHeader(GContext* ctx, const Layer* cell_layer, uint16_t, void*) {
 	int accTimeInSecs = trackingList->totalTime();
 	static char totalTime[13];
 	if (timeInSecs != accTimeInSecs || mode == FREEZE_MODE)
-		snprintf(totalTime, sizeof(totalTime), "%d:%02d/%d:%02d", timeInSecs / (MINUTES_Q * 60), timeInSecs / MINUTES_Q % 60,
-									  accTimeInSecs / (MINUTES_Q * 60), accTimeInSecs / MINUTES_Q % 60);
+		snprintf(totalTime, sizeof(totalTime), "%d:%02d/%d:%02d", timeInSecs / (60 * 60), timeInSecs / 60 % 60,
+									  accTimeInSecs / (60 * 60), accTimeInSecs / 60 % 60);
 	else
-		snprintf(totalTime, sizeof(totalTime), "%d:%02d", timeInSecs / (MINUTES_Q * 60), timeInSecs / MINUTES_Q % 60);
+		snprintf(totalTime, sizeof(totalTime), "%d:%02d", timeInSecs / (60 * 60), timeInSecs / 60 % 60);
 
 	GRect bounds = layer_get_bounds(cell_layer);
 	GRect timeBounds = { LEFT_MARGIN, 0, bounds.size.w / 4 - LEFT_MARGIN, bounds.size.h };
@@ -135,11 +140,11 @@ void drawHeader(GContext* ctx, const Layer* cell_layer, uint16_t, void*) {
 	graphics_draw_text(ctx, time, status_font, timeBounds, GTextOverflowModeFill, GTextAlignmentLeft, NULL);
 
 	if (mode == FREEZE_MODE && selIndex == NULL_V) {
-		int digitShiftX = 47;
+		int digitShiftX = 83;
 		if (changeTimePos == 1)
-			digitShiftX = 57;
+			digitShiftX = 93;
 		else if (changeTimePos == 2)
-			digitShiftX = 63;
+			digitShiftX = 99;
 		int digitShiftY = 15;
 		int digitWidth = 4;
 		graphics_context_set_stroke_color(ctx, GColorBlack);
@@ -283,6 +288,21 @@ static void longUpClick(ClickRecognizerRef, void*) {
 			break;
 		case FREEZE_MODE:
 			freezeTime = time(0L);
+			if (selIndex == NULL_V) {
+				switch (changeTimePos) {
+					case 0:
+						trackingList->addTime(changeTimeAdds[changeTimePos] * 10);
+						break;
+					case 1:
+						trackingList->addTime(changeTimeAdds[changeTimePos] * 3);
+						break;
+					case 2:
+						trackingList->addTime(changeTimeAdds[changeTimePos] * 5);
+						break;
+				}
+				menu_layer_reload_data(menu_layer);
+				return;
+			}
 			trackingList->decIndex();
 			break;
 
@@ -327,6 +347,21 @@ static void longDownClick(ClickRecognizerRef, void*) {
 			break;
 		case FREEZE_MODE:
 			freezeTime = time(0L);
+			if (selIndex == NULL_V) {
+				switch (changeTimePos) {
+					case 0:
+						trackingList->subTime(changeTimeAdds[changeTimePos] * 10);
+						break;
+					case 1:
+						trackingList->subTime(changeTimeAdds[changeTimePos] * 3);
+						break;
+					case 2:
+						trackingList->subTime(changeTimeAdds[changeTimePos] * 5);
+						break;
+				}
+				menu_layer_reload_data(menu_layer);
+				return;
+			}
 			trackingList->incIndex();
 			break;
 	}
@@ -353,9 +388,19 @@ void handleBluetooth(bool connected) {
 
 void handleTick(tm* tickTime, TimeUnits units) {
 	int elementTime = trackingList->updateTime();
-	if (units & MINUTE_UNIT || elementTime % 60 == 0) {
-		if (elementTime > 0 && elementTime % 3600 == 0)
-			vibes_short_pulse();
+	bool elementMinuteChanged = elementTime % 60 == 0 && elementTime > 0;
+	if (units & MINUTE_UNIT || elementMinuteChanged) {
+		if (elementMinuteChanged) {
+			int accTimeInSecs = trackingList->totalTime();
+			int timeInSecs = trackingList->totalTime(false);
+			if (accTimeInSecs > 60 && accTimeInSecs / 60 % (trackingList->getTotalAccHours() * 60) == 0)
+				vibes_enqueue_custom_pattern(veryLongVibe);
+			else if (timeInSecs > 60 && timeInSecs / 60 % (trackingList->getTotalHours() * 60) == 0)
+				vibes_enqueue_custom_pattern(longVibe);
+			else if (elementTime % (60 * 60) == 0)
+				vibes_enqueue_custom_pattern(smallVibe);
+		}
+
 		if (trackingList->getMode() == FREEZE_MODE && mktime(tickTime) - freezeTime >= MAX_FREEZE_TIME)
 			trackingList->switchMode(NORMAL_MODE);
 		menu_layer_reload_data(menu_layer);
@@ -416,10 +461,10 @@ static void handle_msg_received(DictionaryIterator *received, void*) {
 	}
 
 	vector<BaseTracking*> elements;
-	for(auto i = -1; (tuple = dict_find(received, 2 * i + 1)) != NULL || persist_exists(2 * i + 1); --i) {
+	for(auto i = -1; (tuple = dict_find(received, RECEIVED_ELEMENTS_KEYMAP * (2 * i + 1))) != NULL || persist_exists(2 * i + 1); --i) {
 		if (tuple) {
 			char* title = (char*)tuple->value;
-			int* priority = (int*)dict_find(received, 2 * i)->value;
+			int* priority = (int*)dict_find(received, RECEIVED_ELEMENTS_KEYMAP * 2 * i)->value;
 			app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "%s: %d", title, *priority);
 			elements.push_back(new TrackingElement(title, *priority));
 
@@ -431,8 +476,16 @@ static void handle_msg_received(DictionaryIterator *received, void*) {
 			persist_delete(2 * i);
 		}
 	}
+
+	int* totalHours = (int*)dict_find(received, RECEIVED_HOURS_KEYMAP * 1)->value;
+	persist_write_int(RECEIVED_HOURS_KEYMAP * 1, *totalHours);
+	app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "total hours: %d", *totalHours);
+	int* accTotalHours = (int*)dict_find(received, RECEIVED_HOURS_KEYMAP * 2)->value;
+	persist_write_int(RECEIVED_HOURS_KEYMAP * 2, *accTotalHours);
+	app_log(APP_LOG_LEVEL_DEBUG, __FILE__, __LINE__, "total accumulated hours: %d", *accTotalHours);
+
 	delete trackingList;
-	trackingList = new TrackingList(elements, pairs);
+	trackingList = new TrackingList(elements, pairs, *totalHours, *accTotalHours);
 	persist_delete(0);
 
 	menu_layer_reload_data(menu_layer);
@@ -485,11 +538,18 @@ inline vector<BaseTracking*> getElements(void) {
 }
 
 static void init(void) {
-	changeTimeAdds = { { 0, 60 * MINUTES_Q }, { 1, 10 * MINUTES_Q }, { 2, 1 * MINUTES_Q } };
+	changeTimeAdds = { { 0, 60 * 60 }, { 1, 10 * 60 }, { 2, 1 * 60 } };
 
 	PairMap pairs = getPairs();
 	vector<BaseTracking*> elements = getElements();
-	trackingList = new TrackingList(elements, pairs);
+	if (persist_exists(RECEIVED_HOURS_KEYMAP)) {
+		int totalHours = persist_read_int(RECEIVED_HOURS_KEYMAP * 1);
+		int accTotalHours = persist_read_int(RECEIVED_HOURS_KEYMAP * 2);
+		trackingList = new TrackingList(elements, pairs, totalHours, accTotalHours);
+	}
+	else {
+		trackingList = new TrackingList(elements, pairs);
+	}
 
 	status_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
 	window = window_create();

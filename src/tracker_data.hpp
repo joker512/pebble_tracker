@@ -72,6 +72,7 @@ public:
 class TrackingList : private std::vector<BaseTracking*> {
 public:
 	TrackingList(std::vector<BaseTracking*>, PairMap&);
+	TrackingList(std::vector<BaseTracking*>, PairMap&, int, int);
 	~TrackingList();
 
 	using vector::size;
@@ -88,6 +89,12 @@ public:
 	}
 	int getPreviousActiveIndex() const {
 		return activeIndex2;
+	}
+	int getTotalHours() const {
+		return totalHours;
+	}
+	int getTotalAccHours() const {
+		return totalAccHours;
 	}
 
 	int getBinarySize();
@@ -131,5 +138,7 @@ private:
 	int activeIndex2 = NULL_V;
 	int lastTimeStamp = NULL_V;
 	int accumulatedTime = 0;
+	int totalHours = 8;
+	int totalAccHours = 40;
 };
 

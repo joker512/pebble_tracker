@@ -46,8 +46,13 @@ int TrackingPair::getHeight() const {
 	return element1->getHeight() + element2->getHeight();
 }
 
-TrackingList::TrackingList(std::vector<BaseTracking*> elements, PairMap& possiblePairs) : vector<BaseTracking*>(elements) {
-	this->possiblePairs = possiblePairs;
+TrackingList::TrackingList(std::vector<BaseTracking*> elements, PairMap& pairs) : vector<BaseTracking*>(elements) {
+	this->possiblePairs = pairs;
+}
+
+TrackingList::TrackingList(std::vector<BaseTracking*> elements, PairMap& pairs, int totalHours, int totalAccHours) : TrackingList(elements, pairs) {
+	this->totalHours = totalHours;
+	this->totalAccHours = totalAccHours;
 }
 
 TrackingList::~TrackingList() {

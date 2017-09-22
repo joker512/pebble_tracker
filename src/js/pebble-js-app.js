@@ -1,3 +1,8 @@
+var DEFAULT_TOTAL_HOURS = 8;
+var DEFAULT_ACC_TOTAL_HOURS = 40;
+var SEND_ELEMENTS_KEYMAP = 10;
+var SEND_HOURS_KEYMAP = 1000;
+
 function defaultTree() {
 	return [
 		{
@@ -34,17 +39,17 @@ function encodeTree(treeNodes, encTree, counter) {
 		var node = treeNodes[i];
 		var childs = node.children;
 		if (childs) {
-			counter.inc++;
-			var j = counter.inc;
-			encTree[2 * j - 1] = childs[0].text.value + childs[1].text.value;
-			encTree[2 * j] = node.text.value;
+			counter.pairs_index++;
+			var j = 2 * counter.pairs_index - 1;
+			encTree[j] = childs[0].text.value + childs[1].text.value;
+			encTree[j + 1] = node.text.value;
 			encodeTree(childs, encTree, counter);
 		}
 		else {
-			counter.dec--;
-			var k = counter.dec;
-			encTree[2 * k + 1] = node.text.value;
-			encTree[2 * k] = node.text.priority;
+			counter.elements_index++;
+			var k = 2 * counter.elements_index - 1;
+			encTree[SEND_ELEMENTS_KEYMAP * k] = node.text.value;
+			encTree[SEND_ELEMENTS_KEYMAP * (k + 1)] = node.text.priority;
 		}
 	}
 }
@@ -59,28 +64,36 @@ function appMessageNack(e) {
 
 Pebble.addEventListener("showConfiguration", function() {
 	var tree = JSON.parse(localStorage.getItem('tree'));
+	var total = localStorage.getItem('total')
+	var accTotal = localStorage.getItem('acctotal')
 	var url='https://joker512.github.io/tracker.html?tree=';
-	if (tree == null) {
+	if (tree == null || total == null || accTotal == null) {
 		tree = defaultTree();
+		total = DEFAULT_TOTAL_HOURS;
+		accTotal = DEFAULT_ACC_TOTAL_HOURS;
 	}
 	console.log("read tree = " + JSON.stringify(tree));
-	url = url + encodeURIComponent(JSON.stringify(tree));
+	url = url + encodeURIComponent(JSON.stringify(tree)) + "&total=" + total + "&acctotal=" + accTotal;
 	console.log("url = " + url);
 	Pebble.openURL(url);
 });
 
 Pebble.addEventListener("webviewclosed", function(e) {
 	if (e.response !== '') {
-		var tree = JSON.parse(decodeURIComponent(e.response));
-		console.log("got tree = " + JSON.stringify(tree));
-		localStorage.setItem('tree', JSON.stringify(tree));
+		var data = JSON.parse(decodeURIComponent(e.response));
+		console.log("got tree = " + JSON.stringify(data[0]));
+		localStorage.setItem('tree', JSON.stringify(data[0]));
+		localStorage.setItem('total', data[1]);
+		localStorage.setItem('acctotal', data[2]);
 
 		var encTree = {};
 		var counter = {};
-		counter.inc = 0;
-		counter.dec = 0;
-		encodeTree(tree, encTree, counter);
-		console.log("encoded tree = " + JSON.stringify(encTree));
+		counter.pairs_index = 0;
+		counter.elements_index = 0;
+		encodeTree(data[0], encTree, counter);
+		encTree[SEND_HOURS_KEYMAP * 1] = parseInt(data[1]);
+		encTree[SEND_HOURS_KEYMAP * 2] = parseInt(data[2]);
+		console.log("encoded data = " + JSON.stringify(encTree));
 
 		Pebble.sendAppMessage(encTree, appMessageAck, appMessageNack);
 	}
