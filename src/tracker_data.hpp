@@ -141,4 +141,3 @@ private:
 	int totalHours = 8;
 	int totalAccHours = 40;
 };
-

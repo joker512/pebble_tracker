@@ -13,7 +13,7 @@ def configure(ctx):
     ctx.load('g++')
 
     ctx.env.CXXFLAGS = list(ctx.env.CFLAGS)
-    ctx.env.CXXFLAGS.extend(['-std=c++11', '-fPIE', '-fno-unwind-tables', '-fno-exceptions', '-mthumb', '-Wno-write-strings', '-Wno-narrowing'])
+    ctx.env.CXXFLAGS.extend(['-std=c++11', '-Os', '-fPIE', '-fno-unwind-tables', '-fno-exceptions', '-mthumb', '-Wno-write-strings', '-Wno-narrowing'])
     ctx.env.LIB = ['stdc++']
 
 def build(ctx):

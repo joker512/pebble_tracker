@@ -29,7 +29,7 @@ int TrackingElement::getPriority() const {
 
 int TrackingElement::getHeight() const {
 	return 1;
-}  
+}
 
 TrackingPair::TrackingPair(char* name, BaseTracking* element1, BaseTracking* element2) {
 	this->name = name;

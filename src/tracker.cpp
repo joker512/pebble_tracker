@@ -395,7 +395,8 @@ void handleTick(tm* tickTime, TimeUnits units) {
 			int timeInSecs = trackingList->totalTime(false);
 			if (accTimeInSecs > 60 && accTimeInSecs / 60 % (trackingList->getTotalAccHours() * 60) == 0)
 				vibes_enqueue_custom_pattern(veryLongVibe);
-			else if (timeInSecs > 60 && timeInSecs / 60 % (trackingList->getTotalHours() * 60) == 0)
+			else if (timeInSecs > 60 && (timeInSecs / 60 % (trackingList->getTotalHours() * 60) == 0 ||
+						     accTimeInSecs / 60 % (trackingList->getTotalHours() * 60) == 0))
 				vibes_enqueue_custom_pattern(longVibe);
 			else if (elementTime % (60 * 60) == 0)
 				vibes_enqueue_custom_pattern(smallVibe);

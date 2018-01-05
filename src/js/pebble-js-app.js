@@ -29,9 +29,9 @@ function defaultTree() {
 			]
 			},
 			{ text: { name: "distractions", priority: 4 } }
-		]				
+		]
 		}
-	]
+	];
 }
 
 function encodeTree(treeNodes, encTree, counter) {
@@ -64,10 +64,10 @@ function appMessageNack(e) {
 
 Pebble.addEventListener("showConfiguration", function() {
 	var tree = JSON.parse(localStorage.getItem('tree'));
-	var total = localStorage.getItem('total')
-	var accTotal = localStorage.getItem('acctotal')
+	var total = localStorage.getItem('total');
+	var accTotal = localStorage.getItem('acctotal');
 	var url='https://joker512.github.io/tracker.html?tree=';
-	if (tree == null || total == null || accTotal == null) {
+	if (tree === null || total === null || accTotal === null) {
 		tree = defaultTree();
 		total = DEFAULT_TOTAL_HOURS;
 		accTotal = DEFAULT_ACC_TOTAL_HOURS;
